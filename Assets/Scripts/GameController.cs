@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using System;
 public class GameControler : MonoBehaviour
 {
     public int whoTurn; // 0 = x, 1 = o
@@ -22,6 +23,15 @@ public class GameControler : MonoBehaviour
     public Button oPlayresButton;
     public bool playWithAI; //fasle = play normal , true = play with AI
     public GameObject modePanel;
+    class Move {
+        public int row, col; 
+    }
+    public int[,] changeIndex = {
+        {0,1,2},
+        {3,4,5},
+        {6,7,8}
+    };
+    public int player = 2, opponent = 1;
     // Start is called before the first frame update
     
     void Start()
@@ -86,7 +96,7 @@ public class GameControler : MonoBehaviour
 
     void AIMove ()
     {
-        int moveIndex = FindBestMove(1,0);
+        int moveIndex = FindBestMoveForAI(1,0);
 
         tictactoeSpaces[moveIndex].image.sprite = playIcons[whoTurn];
         tictactoeSpaces[moveIndex].interactable = false;
@@ -101,59 +111,17 @@ public class GameControler : MonoBehaviour
         turnIcons[0].SetActive(true);
         turnIcons[1].SetActive(false);
     }
-    int FindBestMove (int AITurn,int playerTurn) // AI turn = 1
+    int FindBestMoveForAI (int AITurn,int playerTurn) // AI turn = 1
     {
         
         if (turnCount == 0 && whoTurn == AITurn){
             return 4;
-        }else if(turnCount >= 3){
-            int indexAttack = indexNextWin(AITurn);
-            if(indexAttack != -100){
-                return indexAttack;
-            }
-
-            int indexDefend = indexNextWin(playerTurn);
-            if(indexDefend != -100){
-                return indexDefend;
-            }
+        }else {
+            Move indexMove = findBestMove(markedspaces);
+            return changeIndex[indexMove.row,indexMove.col];
         }
-        List<int> emptyCells = new List<int>();
-        for (int i = 0; i < tictactoeSpaces.Length; i++) {
-            if (markedspaces[i] == -100) {
-                emptyCells.Add(i);
-            }
-        }
-        if (emptyCells.Count > 0) {
-            int randomIndex = Random.Range(0, emptyCells.Count);
-            return emptyCells[randomIndex];
-        }
-        return -1;
     }
 
-    int indexNextWin(int whichTurn)
-    {
-        int[,] matrix = new int [,] {
-            {0,1,2},
-            {3,4,5},
-            {6,7,8},
-            {0,3,6},
-            {1,4,7},
-            {2,5,8},
-            {0,4,8},
-            {2,4,6}
-        };
-        for(int i = 0;i < 8;i++){
-            int a = matrix[i,0];
-            int b = matrix[i,1];
-            int c = matrix[i,2];
-            if (markedspaces[a] + markedspaces[b] + markedspaces[c] == -100 +(2 * (whichTurn + 1))) {
-                if (markedspaces[a] == -100) return a;
-                if (markedspaces[b] == -100) return b;
-                if (markedspaces[c] == -100) return c;
-            }
-        }
-        return -100;
-    }
     bool WinnerCheck(){
         
         int s1 = markedspaces[0] + markedspaces[1] + markedspaces[2];
@@ -186,7 +154,31 @@ public class GameControler : MonoBehaviour
         }
         return false;
     }
+    bool winnerCheck1()
+    {
+        int[,] b = changeToMatrix(markedspaces);
+        for (int row = 0; row < 3; row++)
+        {
+            if (b[row, 0] != -100 && b[row, 0] == b[row, 1] && b[row, 1] == b[row, 2])
+                return true;
+            
+        }
+        for (int col = 0; col < 3; col++)
+        {
+            if (b[col, 0] != -100 && b[0, col] == b[1, col] && b[1, col] == b[2, col])
+                return true;
+        }
+        if (b[0, 0] != -100 && b[0, 0] == b[1, 1] && b[1, 1] == b[2, 2])
+        {
+            return true;
+        }
 
+        if (b[0, 2] != -100 && b[0, 2] == b[1, 1] && b[1, 1] == b[2, 0])
+        {
+            return true;
+        }
+        return false;
+    }
     void WinnerDisplay(int indexin)
     {
         for(int i = 0;i<tictactoeSpaces.Length;i++){
@@ -245,6 +237,126 @@ public class GameControler : MonoBehaviour
                 AIMove();
             }
         }
+    }   
+
+
+    // AI min Max
+    bool isMoveLeft(int[,] board){
+        for (int i = 0; i < 3; i++)
+            for (int j = 0; j < 3; j++)
+                if (board[i, j] == -100)
+                    return true;
+        return false;
+    }
+    public int[,] changeToMatrix(int[] board){
+        int [,]b = new int [3,3];
+        int count = 0;
+        for (int i = 0; i < 3;i ++){
+            for (int j = 0; j < 3; j++)
+            {
+                b[i, j] = board[count];
+                count++;
+            }
+        }
+        return b;
+    }
+    int evaluate(int[,] b){
+        for(int row = 0;row < 3;row ++){
+            if (b[row,0] !=-100 && b[row,0] == b[row,1] && b[row,1] == b[row,2]){
+                if(b[row ,0] == player) 
+                    return +10;
+
+                else if (b[row,0] == opponent) 
+                    return -10;
+            }   
+        }
+        for (int col = 0; col < 3; col++)
+        {
+            if (b[0,col] != -100 && b[0, col] == b[1, col] &&
+                b[1, col] == b[2, col])
+            {
+                if (b[0, col] == player)
+                    return +10;
+
+                else if (b[0, col] == opponent)
+                    return -10;
+            }
+        }
+        if (b[0, 0] != -100 && b[0, 0] == b[1, 1] && b[1, 1] == b[2, 2])
+        {
+            if (b[0, 0] == player)
+                return +10;
+            else if (b[0, 0] == opponent)
+                return -10;
+        }
+
+        if (b[0, 2] != -100 && b[0, 2] == b[1, 1] && b[1, 1] == b[2, 0])
+        {
+            if (b[0, 2] == player)
+                return +10;
+            else if (b[0, 2] == opponent)
+                return -10;
+        }
+        return 0;
+    }
+    int minmax(int[,] board,int depth,bool isMax){
+        int score = evaluate(board);
+
+        if (score == 10){
+            return score - depth ;
+        }
+        if (score == -10){
+            return score + depth ;
+        }  
+        if(!isMoveLeft(board)){
+            return 0;
+        }
+        if(isMax){
+            int best = -1000;
+            for(int i = 0; i < 3; i++ ){
+                for (int j = 0; j < 3; j ++){
+                    if(board[i,j] == -100){
+                        board[i,j] = player;
+                        best = Math.Max(best,minmax(board,depth + 1,!isMax));
+                        board[i,j] = -100;
+                    }
+                }
+            }
+            return best;
+        }else {
+            int best = 1000;
+            for(int i = 0; i < 3; i++ ){
+                for (int j = 0; j < 3; j ++){
+                    if(board[i,j] == -100){
+                        board[i,j] = opponent;
+                        best = Math.Min(best,minmax(board,depth + 1,!isMax));
+                        board[i,j] = -100;
+                    }
+                }
+            }
+            return best;
+        }
+    }
+    Move findBestMove(int[] b){
+        int [,]board = changeToMatrix(b);
+        int bestVal = -1000; 
+        Move bestMove = new Move();
+        bestMove.row = -1;
+        bestMove.col = -1;  
+        for(int i = 0;i< 3;i++){
+            for(int j = 0; j < 3; j++){
+                if(board[i,j] == -100){
+                    board[i,j] = player;
+                    int moveVal = minmax(board,0,false);
+                    board[i,j] = -100;
+                    if (moveVal > bestVal){
+                        bestMove.row = i;
+                        bestMove.col = j;
+                        bestVal = moveVal;
+                    } 
+                }
+            }
+        }
+        return bestMove;
     }
 }
-
